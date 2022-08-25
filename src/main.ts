@@ -14,6 +14,12 @@ const PARAMETERS = {
   lightColor: "#ffffff",
   lightIntesity: 1,
 };
+
+const CURSOR_POSITION = {
+  x: 0,
+  y: 0,
+};
+
 gui
   .addColor(PARAMETERS, "materialColor")
   .onChange(() => material.color.set(PARAMETERS.materialColor));
@@ -35,6 +41,9 @@ const sizes = {
 const canvas = document.querySelector("canvas#webgl")!;
 const scene = new THREE.Scene();
 
+const cameraGroup = new THREE.Group();
+scene.add(cameraGroup);
+
 const camera = new THREE.PerspectiveCamera(
   35,
   sizes.width / sizes.height,
@@ -42,7 +51,7 @@ const camera = new THREE.PerspectiveCamera(
   100
 );
 camera.position.z = 6;
-scene.add(camera);
+cameraGroup.add(camera);
 
 const objectsDistance = 4;
 const material = new THREE.MeshToonMaterial({
@@ -92,6 +101,11 @@ window.addEventListener("resize", () => {
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 });
 
+window.addEventListener("mousemove", (event) => {
+  CURSOR_POSITION.x = event.clientX / sizes.width - 0.5;
+  CURSOR_POSITION.y = event.clientY / sizes.height - 0.5;
+});
+
 let { scrollY } = window;
 
 window.addEventListener("scroll", () => {
@@ -99,11 +113,21 @@ window.addEventListener("scroll", () => {
 });
 
 const clock = new THREE.Clock();
+let previousTime = 0;
 
 const tick = () => {
   const elapsedTime = clock.getElapsedTime();
+  const deltaTime = elapsedTime - previousTime;
+  previousTime = elapsedTime;
 
   camera.position.y = (-scrollY / sizes.height) * objectsDistance;
+
+  const parallaxX = CURSOR_POSITION.x * 0.25;
+  const parallaxY = -CURSOR_POSITION.y * 0.25;
+  cameraGroup.position.x +=
+    (parallaxX - cameraGroup.position.x) * 5 * deltaTime;
+  cameraGroup.position.y +=
+    (parallaxY - cameraGroup.position.y) * 5 * deltaTime;
 
   for (const mesh of sectionsMeshes) {
     mesh.rotation.x = elapsedTime * 0.14;
