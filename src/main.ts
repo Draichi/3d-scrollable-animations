@@ -2,6 +2,7 @@ import "./style.css";
 import * as THREE from "three";
 import GUI from "lil-gui";
 import meshToonTextureImage from "/textures/gradients/3.jpg";
+import gsap from "gsap";
 
 const textureLoader = new THREE.TextureLoader();
 const meshToonTexture = textureLoader.load(meshToonTextureImage);
@@ -20,9 +21,10 @@ const CURSOR_POSITION = {
   y: 0,
 };
 
-gui
-  .addColor(PARAMETERS, "materialColor")
-  .onChange(() => material.color.set(PARAMETERS.materialColor));
+gui.addColor(PARAMETERS, "materialColor").onChange(() => {
+  material.color.set(PARAMETERS.materialColor);
+  particlesMaterial.color.set(PARAMETERS.materialColor);
+});
 gui
   .addColor(PARAMETERS, "lightColor")
   .onChange(() => light.color.set(PARAMETERS.lightColor));
@@ -41,6 +43,9 @@ const sizes = {
 const canvas = document.querySelector("canvas#webgl")!;
 const scene = new THREE.Scene();
 
+/*
+ * Camera
+ */
 const cameraGroup = new THREE.Group();
 scene.add(cameraGroup);
 
@@ -53,6 +58,9 @@ const camera = new THREE.PerspectiveCamera(
 camera.position.z = 6;
 cameraGroup.add(camera);
 
+/*
+ * Meshes
+ */
 const objectsDistance = 4;
 const material = new THREE.MeshToonMaterial({
   color: PARAMETERS.materialColor,
@@ -73,6 +81,37 @@ scene.add(mesh1, mesh2, mesh3);
 
 const sectionsMeshes = [mesh1, mesh2, mesh3];
 
+/*
+ * Particles
+ */
+const particlesCount = 200;
+const particlesPositions = new Float32Array(particlesCount * 3);
+for (let i = 0; i < particlesCount; i++) {
+  const x = i * 3;
+  const y = i * 3 + 1;
+  const z = i * 3 + 2;
+  particlesPositions[x] = (Math.random() - 0.5) * 10;
+  particlesPositions[y] =
+    objectsDistance * 0.5 -
+    Math.random() * objectsDistance * sectionsMeshes.length;
+  particlesPositions[z] = (Math.random() - 0.5) * 10;
+}
+const particlesGeometry = new THREE.BufferGeometry();
+particlesGeometry.setAttribute(
+  "position",
+  new THREE.BufferAttribute(particlesPositions, 3)
+);
+const particlesMaterial = new THREE.PointsMaterial({
+  color: PARAMETERS.materialColor,
+  sizeAttenuation: true,
+  size: 0.03,
+});
+const particles = new THREE.Points(particlesGeometry, particlesMaterial);
+scene.add(particles);
+
+/*
+ * Light
+ */
 const light = new THREE.DirectionalLight(
   PARAMETERS.lightColor,
   PARAMETERS.lightIntesity
@@ -80,6 +119,9 @@ const light = new THREE.DirectionalLight(
 light.position.set(1, 1, 0);
 scene.add(light);
 
+/*
+ * Renderer
+ */
 const renderer = new THREE.WebGLRenderer({
   canvas: canvas,
   alpha: true,
@@ -87,16 +129,16 @@ const renderer = new THREE.WebGLRenderer({
 renderer.setSize(sizes.width, sizes.height);
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 
+/*
+ * Resize
+ */
 window.addEventListener("resize", () => {
-  // Update sizes
   sizes.width = window.innerWidth;
   sizes.height = window.innerHeight;
 
-  // Update camera
   camera.aspect = sizes.width / sizes.height;
   camera.updateProjectionMatrix();
 
-  // Update renderer
   renderer.setSize(sizes.width, sizes.height);
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 });
@@ -106,15 +148,33 @@ window.addEventListener("mousemove", (event) => {
   CURSOR_POSITION.y = event.clientY / sizes.height - 0.5;
 });
 
+/*
+ * Scroll
+ */
 let { scrollY } = window;
+let currentSection = 0;
 
 window.addEventListener("scroll", () => {
   scrollY = window.scrollY;
+  const sectionIndex = Math.round(scrollY / sizes.height);
+
+  if (currentSection !== sectionIndex) {
+    currentSection = sectionIndex;
+
+    gsap.to(sectionsMeshes[currentSection].rotation, {
+      x: "+=6",
+      y: "+=3",
+      ease: "power2.inOut",
+      duration: 1.5,
+    });
+  }
 });
 
+/*
+ * Animation
+ */
 const clock = new THREE.Clock();
 let previousTime = 0;
-
 const tick = () => {
   const elapsedTime = clock.getElapsedTime();
   const deltaTime = elapsedTime - previousTime;
@@ -130,14 +190,12 @@ const tick = () => {
     (parallaxY - cameraGroup.position.y) * 5 * deltaTime;
 
   for (const mesh of sectionsMeshes) {
-    mesh.rotation.x = elapsedTime * 0.14;
-    mesh.rotation.y = elapsedTime * 0.12;
+    mesh.rotation.x += deltaTime * 0.14;
+    mesh.rotation.y += deltaTime * 0.12;
   }
 
-  // Render
   renderer.render(scene, camera);
 
-  // Call tick again on the next frame
   window.requestAnimationFrame(tick);
 };
 
